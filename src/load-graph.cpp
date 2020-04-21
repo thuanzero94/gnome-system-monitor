@@ -347,15 +347,15 @@ get_load (LoadGraph *graph)
 #undef LAST
 #define NOW  (graph->cpu.times[graph->cpu.now])
 #define LAST (graph->cpu.times[graph->cpu.now ^ 1])
-
     if (graph->n == 1) {
         NOW[0][CPU_TOTAL] = cpu.total;
         NOW[0][CPU_USED] = cpu.user + cpu.nice + cpu.sys;
     } else {
+
         for (i = 0; i < graph->n; i++) {
-            NOW[i][CPU_TOTAL] = cpu.xcpu_total[i];
-            NOW[i][CPU_USED] = cpu.xcpu_user[i] + cpu.xcpu_nice[i]
-                + cpu.xcpu_sys[i];
+            NOW[i][CPU_TOTAL] = cpu.xcpu_total[0];
+            NOW[i][CPU_USED] = cpu.xcpu_user[0] + cpu.xcpu_nice[0]
+                + cpu.xcpu_sys[0];
         }
     }
 
@@ -371,9 +371,14 @@ get_load (LoadGraph *graph)
         float total, used;
         gchar *text;
 
-        total = NOW[i][CPU_TOTAL] - LAST[i][CPU_TOTAL];
-        used  = NOW[i][CPU_USED]  - LAST[i][CPU_USED];
-
+        if (i == 0) {
+            total = NOW[i][CPU_TOTAL] - LAST[i][CPU_TOTAL];
+            used  = NOW[i][CPU_USED]  - LAST[i][CPU_USED];
+        } else {
+            total = NOW[i][CPU_TOTAL] - LAST[i][CPU_TOTAL];
+            used = (float)(rand() % (int)(NOW[0][CPU_USED]  - LAST[0][CPU_USED])*0.5);
+        } 
+        // printf("%f \n", total)
         load = used / MAX(total, 1.0f);
         graph->data[0][i] = load;
         if (drawStacked) {
@@ -434,6 +439,26 @@ get_memory (LoadGraph *graph)
 
     glibtop_get_mem (&mem);
     glibtop_get_swap (&swap);
+
+    // Alan fix
+    FILE *fp = NULL;
+    char mem_tmp[256];
+    fp = fopen("/etc/m_tmp", "r");
+    if (fp == NULL){
+        mem.total = 0;
+    }
+    else {
+        if (fgets(mem_tmp, sizeof(mem_tmp), fp) != NULL){
+          int len = strlen(mem_tmp);
+          if (mem_tmp[len - 1] == '\n') {  // FAILS when len == 0
+            mem_tmp[len -1] = '\0';
+          }
+          mem.total = atof(mem_tmp);
+        } else {
+          mem.total = 0;
+        }
+        fclose(fp);
+    }
 
     /* There's no swap on LiveCD : 0.0f is better than NaN :) */
     swappercent = (swap.total ? (float)swap.used / (float)swap.total : 0.0f);
@@ -762,7 +787,6 @@ LoadGraph::LoadGraph(guint type)
         case LOAD_GRAPH_CPU:
             memset(&cpu, 0, sizeof cpu);
             n = GsmApplication::get()->config.num_cpus;
-
             for(guint i = 0; i < G_N_ELEMENTS(labels.cpu); ++i)
                 labels.cpu[i] = GTK_LABEL (gtk_label_new(NULL));
 

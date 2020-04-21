@@ -186,6 +186,22 @@ GsmApplication::load_settings()
     frequency = cpu.frequency;
 
     config.num_cpus = glibtop_get_sysinfo()->ncpu; // or server->ncpu + 1
+    // Alan Fix
+    FILE *fp = NULL;
+    char buf[256];
+    fp = fopen("/etc/nproc_tmp", "r");
+    if (fp == NULL) {
+        config.num_cpus = 8;
+    }
+    else {
+        if (fgets(buf, sizeof(buf), fp) != NULL) {
+          config.num_cpus = atoi(buf) == 0 ? 8 : atoi(buf);
+        }
+        else {
+          config.num_cpus = 8;
+        }
+        fclose(fp);
+    }
 
     apply_cpu_color_settings (*this->settings.operator->(), this);
 
